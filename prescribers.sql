@@ -1,13 +1,3 @@
-SELECT Count(*)
-FROM prescription
-LEFT JOIN prescriber
-USING(npi);
-
-SELECT Count(*)
-FROM prescriber
-LEFT JOIN prescription
-USING(npi);
-
 --1. a. Which prescriber had the highest total number of claims (totaled over all drugs)? Report the npi and the total number of claims.
 SELECT npi, SUM(total_claim_count)
 FROM prescription
@@ -56,7 +46,41 @@ GROUP BY specialty_description
 ORDER BY SUM(total_claim_count) DESC
 LIMIT 15;
 
---d. **Difficult Bonus:** *Do not attempt until you have solved all other problems!* For each specialty, report the percentage of total claims by that specialty which are for opioids. Which specialties have a high percentage of opioids?
+--d. **Difficult Bonus:** *Do not attempt until you have solved all other problems!* 
+--For each specialty, report the percentage of total claims by that specialty which are for opioids. 
+--Which specialties have a high percentage of opioids?
+WITH
+	all_drug
+	AS (
+		SELECT 
+			specialty_description, 
+			SUM(total_claim_count) AS all_drug_claim
+		FROM prescription
+		LEFT JOIN prescriber
+		USING (npi)
+		LEFT JOIN drug
+		USING(drug_name)
+		GROUP BY specialty_description
+	),
+	opioid_drug
+	AS (
+		SELECT 
+			specialty_description, 
+			SUM(total_claim_count) AS opioid_claim
+		FROM prescription
+		LEFT JOIN prescriber
+		USING (npi)
+		LEFT JOIN drug
+		USING(drug_name)
+		WHERE opioid_drug_flag = 'Y'
+		GROUP BY specialty_description
+	)
+SELECT *, COALESCE(ROUND(opioid_claim/all_drug_claim*100,2),0) AS opioid_pct
+FROM all_drug
+LEFT JOIN opioid_drug
+USING (specialty_description)
+ORDER BY opioid_pct DESC
+--Case Manager/Care Coordinator highest
 
 --3. a. Which drug (generic_name) had the highest total drug cost?
 SELECT generic_name, SUM(total_drug_cost)
@@ -209,6 +233,17 @@ LEFT JOIN prescription
 USING(npi, drug_name)
 ;
 
+--Jacob code
+SELECT p1.npi, d.drug_name, COALESCE(total_claim_count, 0) 
+FROM prescriber AS p1
+CROSS JOIN drug AS d
+FULL JOIN prescription AS p2
+USING (drug_name,npi)
+WHERE specialty_description = 'Pain Management' 
+AND nppes_provider_city = 'NASHVILLE'
+AND opioid_drug_flag = 'Y'
+ORDER BY 3 DESC;
+
 --c. Finally, if you have not done so already, fill in any missing values for total_claim_count with 0. Hint - Google the COALESCE function.
 SELECT npi, prescription.drug_name, COALESCE(total_claim_count, 0) AS total_claim_count
 FROM (
@@ -221,4 +256,5 @@ WHERE specialty_description = 'Pain Management'
 ) as npi_drug
 LEFT JOIN prescription
 USING(npi, drug_name)
+ORDER BY total_claim_count DESC
 ;
